@@ -303,15 +303,9 @@ static void parse_event(const char *msg, struct uevent *uevent,int debug)
 	uevent->partition_num = -1;
 	uevent->vendor_id = "";
 	uevent->product_id = "";
-	uevent->seqnum = 0;
-	//LOGD("parsing kernel event event started") ;
-	
 
 	while(*msg) {
-		if(!strncmp(msg, "SEQNUM=", 7)) {
-		    msg += 7;
-		    uevent->seqnum = atoi(msg);
-		} else	if(!strncmp(msg, "ACTION=", 7)) {
+		if(!strncmp(msg, "ACTION=", 7)) {
 		    msg += 7;
 		    uevent->action = msg;
 		} else if(!strncmp(msg, "DEVPATH=", 8)) {
