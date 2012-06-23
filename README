@@ -3,5 +3,5 @@ hotplugd - Android Service that listen to kernel events using the UEVENT Socket
 
 Purpose:
 Mainly developed to handle usb_modeswitch and connection management for Huawei USB Dongles ( Usb Vendor ID:12d1 )
-can be easily repurposed to list handle and kernel level event.
+can be easily repurposed to handle and kernel level event.
 
