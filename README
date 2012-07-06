@@ -5,3 +5,28 @@ Purpose:
 Mainly developed to handle usb_modeswitch and connection management for Huawei USB Dongles ( Usb Vendor ID:12d1 )
 can be easily repurposed to handle any kernel level event.
 
+For hotplugd to function the following prerequisite must be met
+
+1. a usb_modeswitch data directory must exists at one of the following locations
+/system/etc/usb_modeswitch 
+/system/etc/usb_modeswitch.d
+/etc/usb_modeswitch 
+
+2. the files in the usb_modeswitch directory must be named in the following format
+vendorid:productid e.g 12d1:1446
+
+3. a system service named switch_ms_to_3g must be defined - this executes the usb_modeswitch binary
+   and passes the vendorid, productid (as discovered by the uevent poll) and the full path to the
+   configuration file
+   
+4. a system service named ril-daemon must defined - this is start when a tty device name ttyUSB2 is 
+   created, this may be better fired off when a wwan device is created instead
+   
+
+
+
+
+
+
+
+
