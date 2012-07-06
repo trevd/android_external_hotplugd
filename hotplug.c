@@ -38,6 +38,23 @@ struct hotplug_info {
 	int debug;
 
 } ;
+void die(char *s)
+{
+	LOGI("dying with %s",s);
+	write(2,s,strlen(s));
+	exit(1);
+}
+char *bprintf(const char *fmt, ...)
+{
+	char *strp = NULL;
+
+	va_list args;
+	va_start(args, fmt);
+	vasprintf(&strp, fmt, args);
+	va_end(args);
+
+	return strp;
+}
 
 static int file_exists(char *filename)
 {
@@ -74,21 +91,15 @@ static void stop_service(const char * service_name)
 	property_set("ctl.stop",service_name);
 	LOGD("stop %s",service_name);
 }
-void log_this(char *text,int level)
+static void find_modeswitch_directory(struct hotplug_info *hotplug_info)
 {
-	switch(level)
-	{
-		case 0:
-			LOGD("%s",text);
-			break;
-		case 1:
-			LOGE("%s",text);
-			break;
-		default:
-			LOGI("%s",text);
-			break;
-			}
-		
+	LOGD("hotplug.modeswitch.d not set...checking known locations");
+	if(test_directory(hotplug_info,"/etc/usb_modeswitch")) return;
+	if(test_directory(hotplug_info,"/system/etc/usb_modeswitch")) return;
+	if(test_directory(hotplug_info,"/system/etc/usb_modeswitch.d")) return;
+	die("hotplug.modeswitch.d");
+
+	
 }
 static int wait_for_property(const char *name, const char *desired_value, int maxwait)
 {
@@ -109,45 +120,6 @@ static int wait_for_property(const char *name, const char *desired_value, int ma
     return -1; /* failure */
 }
 
-
-static void query_tty_device(struct uevent *uevent)
-{
-	
-	if(!strncmp(uevent->name,"ttyUSB0",7))
-	{
-		property_set("ril.pppd_tty", "/dev/ttyUSB0");
-		LOGD("ril.pppd_tty: /dev/ttyUSB0");
-	}
-	if(!strncmp(uevent->name,"ttyUSB2",7))
-	{
-		property_set("rild.libargs", "-d /dev/ttyUSB2");
-		property_set("rild.libpath", "/system/lib/libhuaweigeneric-ril.so");
-		//LOGD("rild.libpath: system/lib/libreference-ril.so - rild.libargs: -d /dev/ttyUSB2\n");
-		LOGD("Kick the ril-daemon");
-		start_service("ril-daemon");
-	}	
-}
-// This badger will switch the device mode if we find a valid config
-static int query_usb_modeswitch( char* config_filename,struct hotplug_info *hotplug_info)
-{
-	if(!file_exists(config_filename)) // usb_modeswitch file not found for this device
-		return 1 ; 
-
-	LOGD("Config:%s",config_filename);
-	property_set("hotplugd.modeswitch_file", config_filename);
-	char *switch_service;
-	int configlen = strlen(config_filename);
-	int servicelen= strlen("switch_ms_to_3g:-c");
-	if (!(switch_service = malloc((configlen + servicelen) * sizeof(char))))
-	{
-		LOGE("cannot alloc memory");
-	} else {
-		sprintf(switch_service,"switch_ms_to_3g:-c%s",config_filename);
-		start_service(switch_service);		
-		free(switch_service);
-	}
-	return 0;		
-}
 static void write_uevent_logcat(struct uevent *uevent,const char* label)
 {
 	LOGD(" %s { action:'%s' sub:'%s', type:'%s', name:'%s', vendor:%s product:%s\n\t\t\tpath:'%s' }\n",label,uevent->action, uevent->subsystem,uevent->type,uevent->name,uevent->vendor_id ,uevent->product_id,uevent->path);
@@ -167,32 +139,7 @@ static int property_test(const char* name,char* testvalue )
 	LOGD("Result of Comparison %u",res);
 	return res;
 }
-static void handle_tty_remove_event(const char * ttyName)
-{
-	
-	char * testvalue;
-	int ttylen = strlen(ttyName);
-	
-	LOGD("handle_tty_remove_event for %s - Length:%u",ttyName,ttylen);
-	ttylen +=6;
-	if (!(testvalue = malloc(ttylen * sizeof(char))))
-	{
-		LOGE("cannot alloc memory");
-		return ;
-	} else {
-		sprintf(testvalue,"/dev/%s",ttyName);
-		LOGD("testvalue is set to %s",testvalue);
-		if(!property_test("ril.pppd_tty",testvalue))
-		{
-			// take a breath
-			LOGD("Stopping ril-daemon");
-			sleep(3);
-			stop_service("ril-daemon");
-		}
-		LOGD("testvalue is set to %s - addr : %x",testvalue, *testvalue);
-		free(testvalue);
-	}	
-}
+
 static void handle_event(struct uevent *uevent,struct hotplug_info *hotplug_info)
 {
 	write_uevent_logcat(uevent,uevent->type);
@@ -216,18 +163,34 @@ static void handle_event(struct uevent *uevent,struct hotplug_info *hotplug_info
 					LOGE("cannot alloc memory");
 					break;
 				} else {
-					sprintf(config_filename,"%s/%s_%s",hotplug_info->modeswitch_d ,uevent->vendor_id ,uevent->product_id);
-					query_usb_modeswitch(config_filename,hotplug_info);
+					char * config_filename = bprintf("%s/%s:%s",hotplug_info->modeswitch_d,uevent->vendor_id ,uevent->product_id);
+					LOGD("Looking For usb_modeswitch config in location %s",config_filename);
+					if(!file_exists(config_filename)){ // usb_modeswitch file not found for this device
+						LOGD("Config Not Found");
+						break; 
+						}
+						
+					char * usb_modeswitch_command = bprintf("switch_ms_to_3g:-v0x%s -p0x%s -c%s",uevent->vendor_id ,uevent->product_id,config_filename);
+					start_service(usb_modeswitch_command);							
+					free(usb_modeswitch_command);
 					free(config_filename);
 				}
 				
 			}else if(!strncmp(uevent->type,"usb-serial",10)){
-				//Serial Killa
+				//Serial Killals
 				write_uevent_logcat(uevent,uevent->type);
 			
 			} else if(!strncmp(uevent->subsystem,"tty",3)){
 				write_uevent_logcat(uevent,uevent->type);
-				query_tty_device(uevent);	
+				if(!strncmp(uevent->name,"ttyUSB0",7))
+					property_set("ril.pppd_tty", "/dev/ttyUSB0");
+					
+				if(!strncmp(uevent->name,"ttyUSB2",7))
+				{
+					property_set("rild.libargs", "-d /dev/ttyUSB2");
+					property_set("rild.libpath", "/system/lib/libhuaweigeneric-ril.so");
+					start_service("ril-daemon");
+				}	
 				
 			}else {
 				//write_uevent_logcat(uevent,"ignored");
@@ -259,22 +222,8 @@ static void handle_event(struct uevent *uevent,struct hotplug_info *hotplug_info
 			break;
 	}
 }
-void die(char *s)
-{
-	LOGI("dying with %s",s);
-	write(2,s,strlen(s));
-	exit(1);
-}
-static void find_modeswitch_directory(struct hotplug_info *hotplug_info)
-{
-	LOGD("hotplug.modeswitch.d not set...checking known locations");
-	if(test_directory(hotplug_info,"/etc/usb_modeswitch")) return;
-	if(test_directory(hotplug_info,"/system/etc/usb_modeswitch")) return;
-	if(test_directory(hotplug_info,"/system/etc/usb_modeswitch.d")) return;
-	die("hotplug.modeswitch.d");
 
-	
-} 
+ 
 static void parse_hotplug_info(struct hotplug_info *hotplug_info)
 {
 	char value[PROPERTY_VALUE_MAX];
@@ -348,7 +297,6 @@ static void parse_event(const char *msg, struct uevent *uevent,int debug)
 		    /* advance to after the next \0 */
 		while(*msg++);
 	}
-	//LOGD("parsing kernel event complete");
 	return ;
 }
 int main(int argc, char *argv[])
@@ -382,8 +330,6 @@ int main(int argc, char *argv[])
 		if (uevent_buffer_length == -1) 
 			die("receive error\n");
 		struct uevent uevent;
-		//print_raw_data(uevent_msg,uevent_buffer_length);
-		//pasta_vibe(&hotplug_info);
 	        parse_event(uevent_msg, &uevent,hotplug_info.debug);
 	        handle_event(&uevent,&hotplug_info);
 	}
