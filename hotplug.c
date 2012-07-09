@@ -151,40 +151,30 @@ static void handle_event(struct uevent *uevent,struct hotplug_info *hotplug_info
 			if(!strncmp(uevent->type,"usb_interface",12)){		
 				// see if this interface is ripe for a switching
 				write_uevent_logcat(uevent,uevent->type);
-				char * config_filename;
-				if(!strncmp(uevent->vendor_id,"1bbb",4))
-				{
-					// ignore a the archos key
-					LOGI("Ignore Archos Stick");
-					break ;
+				char * config_filename = bprintf("%s/%s:%s",hotplug_info->modeswitch_d,uevent->vendor_id ,uevent->product_id);
+				LOGD("Looking For usb_modeswitch config in location %s",config_filename);
+				if(!file_exists(config_filename)){ // usb_modeswitch file not found for this device
+					LOGD("Config Not Found");
+					break; 
 				}
-				if (!(config_filename = malloc((hotplug_info->modeswitch_length + 10) * sizeof(char))))
-				{
-					LOGE("cannot alloc memory");
-					break;
-				} else {
-					char * config_filename = bprintf("%s/%s:%s",hotplug_info->modeswitch_d,uevent->vendor_id ,uevent->product_id);
-					LOGD("Looking For usb_modeswitch config in location %s",config_filename);
-					if(!file_exists(config_filename)){ // usb_modeswitch file not found for this device
-						LOGD("Config Not Found");
-						break; 
-						}
 						
 					char * usb_modeswitch_command = bprintf("switch_ms_to_3g:-v0x%s -p0x%s -c%s",uevent->vendor_id ,uevent->product_id,config_filename);
 					start_service(usb_modeswitch_command);							
 					free(usb_modeswitch_command);
 					free(config_filename);
-				}
-				
 			}else if(!strncmp(uevent->type,"usb-serial",10)){
 				//Serial Killals
 				write_uevent_logcat(uevent,uevent->type);
-			
 			} else if(!strncmp(uevent->subsystem,"tty",3)){
 				write_uevent_logcat(uevent,uevent->type);
-				if(!strncmp(uevent->name,"ttyUSB0",7))
-					property_set("ril.pppd_tty", "/dev/ttyUSB0");
-					
+				if(!strncmp(uevent->name,"ttyUSB0",7) || !strncmp(uevent->name,"ttyHS4",7)  )
+					property_set("ril.pppd_tty", uevent->name);
+				
+				if(!strncmp(uevent->name,"ttyHS3",7)){
+					property_set("rild.libargs", "-d /dev/ttyHS3");
+					property_set("rild.libpath", "/system/lib/libtcl-ril.so");
+					start_service("ril-daemon");
+				}
 				if(!strncmp(uevent->name,"ttyUSB2",7))
 				{
 					property_set("rild.libargs", "-d /dev/ttyUSB2");
@@ -302,6 +292,10 @@ static void parse_event(const char *msg, struct uevent *uevent,int debug)
 int main(int argc, char *argv[])
 {
 	
+	if( argc > 1 )
+	{
+		// TODO: Allow hotplug to be run from cold :)	
+	}
 	struct sockaddr_nl nls;
 	struct pollfd pfd;
 	char uevent_msg[1024];
@@ -312,7 +306,8 @@ int main(int argc, char *argv[])
 	memset(&nls,0,sizeof(struct sockaddr_nl));
 	nls.nl_family = AF_NETLINK;
 	nls.nl_pid = getpid();
-	nls.nl_groups = -1;
+	nls.nl_groups = -1;  
+
 
 	pfd.events = POLLIN;
 	pfd.fd = socket(PF_NETLINK, SOCK_DGRAM, NETLINK_KOBJECT_UEVENT);
