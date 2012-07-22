@@ -5,7 +5,10 @@ Purpose:
 Mainly developed to handle usb_modeswitch and connection management for Huawei USB Dongles ( Usb Vendor ID:12d1 )
 can be easily repurposed to handle any kernel level event.
 
-For hotplugd to function the following prerequisite must be met
+This is service is dependent on libusb-1.x . A slighty tweaked version for Android can be found 
+here 
+
+For hotplugd to function the following prerequisites must be met
 
 1. a usb_modeswitch data directory must exists at one of the following locations
 /system/etc/usb_modeswitch 
@@ -13,7 +16,7 @@ For hotplugd to function the following prerequisite must be met
 /etc/usb_modeswitch 
 
 2. the files in the usb_modeswitch directory must be named in the following format
-vendorid:productid e.g 12d1:1446
+vendorid_productid e.g 12d1_1446
 
 3. a system service named switch_ms_to_3g must be defined - this executes the usb_modeswitch binary
    and passes the vendorid, productid (as discovered by the uevent poll) and the full path to the
@@ -22,6 +25,44 @@ vendorid:productid e.g 12d1:1446
 4. a system service named ril-daemon must defined - this is start when a tty device name ttyUSB2 is 
    created, this may be better fired off when a wwan device is created instead
    
+The service can be run in two modes 
+1. hotplugd - intended to do continous monitoring through out the life of the system
+2. preheated - which is intended to be triggered when the dev has finished booting. Preheated Mode looks for
+devices already plugging in
+
+Example Service Definitions for init.rc
+
+        on boot
+         
+        on property:dev.bootcomplete=1
+                start preheated
+
+        service hotplugd /system/bin/logwrapper /system/bin/hotplugd
+            class core
+            critical
+
+        # preheated is a symlink to hotplug. This check if the device is already connected
+        service preheated /system/bin/logwrapper /system/bin/hotplugd preheated
+            oneshot     
+            disbaled
+            
+        service switch_ms_to_3g /system/bin/logwrapper /system/bin/usb_modeswitch
+            class core
+            user root
+            group root
+            disabled
+            oneshot
+
+
+        # disabled rild to be started at a later by the hotplugd
+        service ril-daemon /system/bin/rild
+            socket rild stream 660 root radio
+            socket rild-debug stream 660 radio system
+            user root
+            group radio cache inet misc audio sdcard_rw
+            disabled
+
+
 
 
 

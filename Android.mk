@@ -1,8 +1,7 @@
 LOCAL_PATH := $(call my-dir)
 
 common_src_files := \
-    hotplug.c
-
+    hotplug.c 
 #
 # Executable
 #
@@ -13,7 +12,8 @@ LOCAL_SRC_FILES := \
     $(common_src_files)
 
 LOCAL_SHARED_LIBRARIES := \
-    libcutils
+    libcutils \
+    libusb
 
 LOCAL_STATIC_LIBRARIES := 
 
