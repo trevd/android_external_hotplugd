@@ -6,7 +6,7 @@ Mainly developed to handle usb_modeswitch and connection management for Huawei U
 can be easily repurposed to handle any kernel level event.
 
 This is service is dependent on libusb-1.x . A slighty tweaked version for Android can be found 
-here 
+here https://github.com/trevd/libusb-android
 
 For hotplugd to function the following prerequisites must be met
 
@@ -39,7 +39,6 @@ Example Service Definitions for init.rc
 
         service hotplugd /system/bin/logwrapper /system/bin/hotplugd
             class core
-            critical
 
         # preheated is a symlink to hotplug. This check if the device is already connected
         service preheated /system/bin/logwrapper /system/bin/hotplugd preheated
