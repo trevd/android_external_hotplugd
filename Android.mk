@@ -7,7 +7,6 @@ common_src_files := \
 #
 
 include $(CLEAR_VARS)
-
 LOCAL_SRC_FILES := \
     $(common_src_files)
 

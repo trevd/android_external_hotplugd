@@ -1,4 +1,4 @@
-#define LOG_TAG "hotplugd"
+#define ALOG_TAG "hotplugd"
 #include <cutils/log.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -40,7 +40,7 @@ struct hotplug_info {
 } ;
 void die(char *s)
 {
-	LOGI("dying with %s",s);
+	ALOGI("dying with %s",s);
 	write(2,s,strlen(s));
 	exit(1);
 }
@@ -60,10 +60,10 @@ static int file_exists(char *filename)
 {
 	struct stat sb;
 	if(stat(filename, &sb) == -1) {
-		LOGD("%s Not Found",filename);
+		ALOGD("%s Not Found",filename);
 		return 0 ; 
 	}
-	LOGD("%s Found",filename);
+	ALOGD("%s Found",filename);
 	return 1;
 }
 static int test_directory(struct hotplug_info *hotplug_info,const char * path)
@@ -73,27 +73,27 @@ static int test_directory(struct hotplug_info *hotplug_info,const char * path)
 	if (stat(path, &statbuf) != -1) {
 	   if (S_ISDIR(statbuf.st_mode)) {
 	   	hotplug_info->modeswitch_d = path;
-   		LOGD("%s found",path);
+   		ALOGD("%s found",path);
 		isDir = 1;
 	   } 
 	else
-		LOGD("%s not found",path);
+		ALOGD("%s not found",path);
 	}
 	return isDir;
 }
 static void start_service(const char * service_name)
 {
 	property_set("ctl.start",service_name);
-	LOGD("starting %s",service_name);
+	ALOGD("starting %s",service_name);
 }
 static void stop_service(const char * service_name)
 {
 	property_set("ctl.stop",service_name);
-	LOGD("stop %s",service_name);
+	ALOGD("stop %s",service_name);
 }
 static void find_modeswitch_directory(struct hotplug_info *hotplug_info)
 {
-	LOGD("hotplug.modeswitch.d not set...checking known locations");
+	ALOGD("hotplug.modeswitch.d not set...checking known locations");
 	if(test_directory(hotplug_info,"/etc/usb_modeswitch")) return;
 	if(test_directory(hotplug_info,"/system/etc/usb_modeswitch")) return;
 	if(test_directory(hotplug_info,"/system/etc/usb_modeswitch.d")) return;
@@ -122,29 +122,29 @@ static int wait_for_property(const char *name, const char *desired_value, int ma
 
 static void write_uevent_logcat(struct uevent *uevent,const char* label)
 {
-	LOGD(" %s { action:'%s' sub:'%s', type:'%s', name:'%s', vendor:%s product:%s\n\t\t\tpath:'%s' }\n",label,uevent->action, uevent->subsystem,uevent->type,uevent->name,uevent->vendor_id ,uevent->product_id,uevent->path);
+	ALOGD(" %s { action:'%s' sub:'%s', type:'%s', name:'%s', vendor:%s product:%s\n\t\t\tpath:'%s' }\n",label,uevent->action, uevent->subsystem,uevent->type,uevent->name,uevent->vendor_id ,uevent->product_id,uevent->path);
 }
 static int property_test(const char* name,char* testvalue )
 {
 	char value[PROPERTY_VALUE_MAX];
 	// check to see if this is a device we are interested
-	LOGD("Checking value of %s",name);
+	ALOGD("Checking value of %s",name);
 	if(!property_get(name,value,NULL))
 	{
-		LOGD("Property Not Found");
+		ALOGD("Property Not Found");
 		return 2;
 	}
-	LOGD("Comparing String %s %s",value,testvalue);
+	ALOGD("Comparing String %s %s",value,testvalue);
 	int res = strncmp(value,testvalue,strlen(testvalue));
-	LOGD("Result of Comparison %u",res);
+	ALOGD("Result of Comparison %u",res);
 	return res;
 }
 static void try_usb_modeswitch(const char * vendor_id,const char * product_id,const char * modeswitch_d){
 
         char * config_filename = bprintf("%s/%04s_%04s",modeswitch_d,vendor_id ,product_id);
-        LOGD("Looking For usb_modeswitch config in location %s",config_filename);
+        ALOGD("Looking For usb_modeswitch config in location %s",config_filename);
 	if(!file_exists(config_filename)){ // usb_modeswitch file not found for this device
-	LOGD("Config Not Found");
+	ALOGD("Config Not Found");
                 return ;
 	}
 	char * usb_modeswitch_command = bprintf("switch_ms_to_3g:-v0x%04s -p0x%04s -c%s",vendor_id ,product_id,config_filename);
@@ -200,11 +200,11 @@ static void handle_event(struct uevent *uevent,struct hotplug_info *hotplug_info
 				write_uevent_logcat(uevent,uevent->type);
 				if(!strncmp(uevent->name,"ttyUSB2",7))
 				{
-					LOGD("Stopping Rild");	
+					ALOGD("Stopping Rild");	
 					stop_service("ril-daemon");
 				}else if(!strncmp(uevent->name,"ttyUSB0",7)){
 					system("pkill -9 ppp");
-					LOGD("Killing PPP");	
+					ALOGD("Killing PPP");	
 				}
 			}
 			break;
@@ -323,7 +323,7 @@ int preheated(const char * modeswitch_d){
                 sprintf(productid,"%04x",devDesc.idProduct);
                 try_usb_modeswitch(vendorid, productid,modeswitch_d);                 
                 free(vendorid);free(productid);
-                LOGD ("   iVendor = %04x idProduct = %04x\n", devDesc.idVendor,devDesc.idProduct);
+                ALOGD ("   iVendor = %04x idProduct = %04x\n", devDesc.idVendor,devDesc.idProduct);
                 libusb_close (devHandle);
                 devHandle = NULL;
                 idx++;
@@ -337,11 +337,11 @@ int preheated(const char * modeswitch_d){
 }
 int main(int argc, char *argv[])
 {
-        LOGD("HotPlug Service Start argc:%d\n",argc);
+        ALOGD("HotPlug Service Start argc:%d\n",argc);
         struct hotplug_info hotplug_info;
 	parse_hotplug_info(&hotplug_info);
 	if(argc == 2){
-	        LOGD("Warm me up then Preheating with argc:%d argv[1]=%s",argc,argv[1]);
+	        ALOGD("Warm me up then Preheating with argc:%d argv[1]=%s",argc,argv[1]);
         	if( !strncmp(argv[1],"preheated",strlen("preheated") ))
 	        {
                	        printf("Running hotplugd as preheated - looking for existing devicesmodeswitch.d:%s length:%u debug:%u\n",hotplug_info.modeswitch_d,hotplug_info.modeswitch_length,hotplug_info.debug);
@@ -354,7 +354,7 @@ int main(int argc, char *argv[])
 	struct pollfd pfd;
 	char uevent_msg[1024];
 	// Open hotplug event netlink socket
-	LOGI("Starting hotplugd For UsbModeSwitch Management - Settings:modeswitch.d:%s length:%u debug:%u",hotplug_info.modeswitch_d,hotplug_info.modeswitch_length,hotplug_info.debug);
+	ALOGI("Starting hotplugd For UsbModeSwitch Management - Settings:modeswitch.d:%s length:%u debug:%u",hotplug_info.modeswitch_d,hotplug_info.modeswitch_length,hotplug_info.debug);
 	memset(&nls,0,sizeof(struct sockaddr_nl));
 	nls.nl_family = AF_NETLINK;
 	nls.nl_pid = getpid();
@@ -364,13 +364,13 @@ int main(int argc, char *argv[])
 	pfd.events = POLLIN;
 	pfd.fd = socket(PF_NETLINK, SOCK_DGRAM, NETLINK_KOBJECT_UEVENT);
 	if (pfd.fd==-1)
-		LOGE("hotplugd cannot create socket, are you root?\n");
+		ALOGE("hotplugd cannot create socket, are you root?\n");
 
 	// Listen to netlink socket
 
 	if (bind(pfd.fd, (void *)&nls, sizeof(struct sockaddr_nl)))
 		die("bind failed\n");
-	LOGD("Give us a go on your UEVENT");
+	ALOGD("Give us a go on your UEVENT");
 	while (-1!=poll(&pfd, 1, -1)) {
 
 		int uevent_buffer_length = recv(pfd.fd, uevent_msg, sizeof(uevent_msg), MSG_DONTWAIT);
