@@ -144,8 +144,8 @@ static void try_usb_modeswitch(const char * vendor_id,const char * product_id,co
         char * config_filename = bprintf("%s/%04s_%04s",modeswitch_d,vendor_id ,product_id);
         ALOGD("Looking For usb_modeswitch config in location %s",config_filename);
 	if(!file_exists(config_filename)){ // usb_modeswitch file not found for this device
-	ALOGD("Config Not Found");
-                return ;
+	        ALOGD("Config Not Found");
+                        return ;
 	}
 	char * usb_modeswitch_command = bprintf("switch_ms_to_3g:-v0x%04s -p0x%04s -c%s",vendor_id ,product_id,config_filename);
 	start_service(usb_modeswitch_command);							
@@ -170,8 +170,10 @@ static void handle_event(struct uevent *uevent,struct hotplug_info *hotplug_info
 				write_uevent_logcat(uevent,uevent->type);
 			} else if(!strncmp(uevent->subsystem,"tty",3)){
 				write_uevent_logcat(uevent,uevent->type);
-				if(!strncmp(uevent->name,"ttyUSB0",7) || !strncmp(uevent->name,"ttyHS4",7)  )
-					property_set("ril.pppd_tty", uevent->name);
+				if(!strncmp(uevent->name,"ttyUSB0",7))
+       					property_set("ril.pppd_tty", "/dev/ttyUSB0");
+                                if(!strncmp(uevent->name,"ttyHS4",7) )
+					property_set("ril.pppd_tty", "/dev/ttyHS4");
 				
 				if(!strncmp(uevent->name,"ttyHS3",7)){
 					property_set("rild.libargs", "-d /dev/ttyHS3");
@@ -292,7 +294,8 @@ static void parse_event(const char *msg, struct uevent *uevent,int debug)
 	}
 	return ;
 }
-int preheated(const char * modeswitch_d){
+
+int preheated(int print_list,const char * modeswitch_d){
 
         libusb_device                    **devList = NULL;
         libusb_device                    *devPtr = NULL;
@@ -321,8 +324,12 @@ int preheated(const char * modeswitch_d){
                 char* productid= malloc(4);;
                 sprintf(vendorid,"%04x",devDesc.idVendor);
                 sprintf(productid,"%04x",devDesc.idProduct);
-                try_usb_modeswitch(vendorid, productid,modeswitch_d);                 
+                if( print_list == 0 )
+                        printf("iVendor = %04x idProduct = %04x\n", devDesc.idVendor,devDesc.idProduct);                       
+                else
+                        try_usb_modeswitch(vendorid, productid,modeswitch_d);                 
                 free(vendorid);free(productid);
+
                 ALOGD ("   iVendor = %04x idProduct = %04x\n", devDesc.idVendor,devDesc.idProduct);
                 libusb_close (devHandle);
                 devHandle = NULL;
@@ -341,13 +348,13 @@ int main(int argc, char *argv[])
         struct hotplug_info hotplug_info;
 	parse_hotplug_info(&hotplug_info);
 	if(argc == 2){
-	        ALOGD("Warm me up then Preheating with argc:%d argv[1]=%s",argc,argv[1]);
-        	if( !strncmp(argv[1],"preheated",strlen("preheated") ))
+	        int print= strncmp(argv[1],"list-usb",strlen("list-usb"));
+        	if(  print==0 || (!strncmp(argv[1],"preheated",strlen("preheated") )))
 	        {
+	                ALOGD("Warm me up then Preheating with argc:%d argv[1]=%s",argc,argv[1]);
                	        printf("Running hotplugd as preheated - looking for existing devicesmodeswitch.d:%s length:%u debug:%u\n",hotplug_info.modeswitch_d,hotplug_info.modeswitch_length,hotplug_info.debug);
-        		return preheated(hotplug_info.modeswitch_d);
-        		// TODO: Allow hotplug to be run from cold :)	
-        	}
+        		return preheated(print,hotplug_info.modeswitch_d);
+        	}       
         	return 0;
         }
 	struct sockaddr_nl nls;
