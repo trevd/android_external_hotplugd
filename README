@@ -1,3 +1,7 @@
+OBSOLETE: THIS REPO WILL BE DELETED SOON.
+
+Repo's marked as obsolete have normally been superceeded by newer work
+
 Description:
 hotplugd - Android Service that listen to kernel events using the UEVENT Socket
 
